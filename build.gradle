@@ -57,4 +57,8 @@ task createTempSqliteDB {
 
 tasks.test.dependsOn("createTempSqliteDB")
 
+tasks.withType(Test) {
+    environment 'DB_PATH','/tmp/test.db'
+}
+
 

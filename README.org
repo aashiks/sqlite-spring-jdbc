@@ -115,3 +115,14 @@ task createTempSqliteDB {
 
 tasks.test.dependsOn("createTempSqliteDB")
 #+END_SRC
+
+**** Application Configuration
+
+The application needs an environment variable called ~DB_PATH~ to be set. This is the path to the actual SQLite DB file. When tests are run, the configuration in build.gradle takes care of it by creating a file in ~/tmp/~ directory and setting the appropriate environment variable.
+
+#+BEGIN_SRC groovy
+  
+tasks.withType(Test) {
+    environment 'DB_PATH','/tmp/test.db'
+}
+#+END_SRC
