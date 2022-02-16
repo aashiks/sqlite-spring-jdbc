@@ -1,5 +1,6 @@
 
-I wanted to use [[https://spring.io/projects/spring-data-jdbc][Spring Data JDBC]] with Sqlite, and looking the [[https://docs.spring.io/spring-data/jdbc/docs/current/reference/html/#reference][reference's]] "Requirements" section tells me that Sqlite isn't supported. Like any Good programmer, I googled around and the following is the outcome.
+I wanted to use [[https://spring.io/projects/spring-data-jdbc][Spring Data JDBC]] with Sqlite, and looking the [[https://docs.spring.io/spring-data/jdbc/docs/current/reference/html/#reference][reference's]] "Requirements" section tells me that Sqlite isn't supported. Like any Good programmer, I googled around and cobbled together a spring boot application with Gradle, Flyway, some tests and migrations.
+
 
 ** Implementing Sqlite Support for Spring Boot JDBC
 
