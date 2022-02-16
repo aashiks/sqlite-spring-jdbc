@@ -1,0 +1,117 @@
+
+I wanted to use [[https://spring.io/projects/spring-data-jdbc][Spring Data JDBC]] with Sqlite, and looking the [[https://docs.spring.io/spring-data/jdbc/docs/current/reference/html/#reference][reference's]] "Requirements" section tells me that Sqlite isn't supported. Like any Good programmer, I googled around and the following is the outcome.
+
+** Implementing Sqlite Support for Spring Boot JDBC
+
+Reference [[https://stackoverflow.com/questions/61851491/spring-data-jdbc-firebird-dialect-not-recognized][Implementing Firebird database support]]. The Stackoverflow answer is VERY comprehensive. As per the answer, you need the following for Spring Data JDBC to work. 
+
+- A dialect
+- A dialect resolver
+- A config file for Spring to locate the dialect resolver
+
+Turns out, following the Stackoverflow answer is enough to get the whole thing working. I am going reproduce the answer here because I don't know what will happen to the SO answer.
+
+*** Dialect
+
+The Dialect is an implementation of [[https://docs.spring.io/spring-data/jdbc/docs/current/api/org/springframework/data/relational/core/dialect/AbstractDialect.html][AbstractDialect]]. Spring comes with a few implementations already. Since SQLite is ANSI SQL compatible, we can just follow what the Stackoverflow answer tells you : extend the [[https://docs.spring.io/spring-data/jdbc/docs/current/api/org/springframework/data/relational/core/dialect/AnsiDialect.html][AnsiDialect]] class.
+
+#+BEGIN_SRC java
+
+import org.springframework.data.relational.core.dialect.AnsiDialect;
+import org.springframework.data.relational.core.dialect.ArrayColumns;
+import org.springframework.data.relational.core.dialect.LockClause;
+import org.springframework.data.relational.core.sql.LockOptions;
+
+public class SQLiteDialect extends AnsiDialect {
+
+    public static final SQLiteDialect INSTANCE = new SQLiteDialect();
+
+    @Override
+    public LockClause lock() {
+        return LOCK_CLAUSE;
+    }
+
+    @Override
+    public ArrayColumns getArraySupport() {
+        return ArrayColumns.Unsupported.INSTANCE;
+    }
+
+    private static final LockClause LOCK_CLAUSE = new LockClause() {
+
+        @Override
+        public String getLock(LockOptions lockOptions) {
+            return "WITH LOCK";
+        }
+
+        @Override
+        public Position getClausePosition() {
+            return Position.AFTER_ORDER_BY;
+        }
+    };
+}
+#+END_SRC
+
+
+*** Dialect Resolver
+
+This is also a VERY straightforward implementation
+
+#+BEGIN_SRC java
+
+import org.springframework.data.jdbc.repository.config.DialectResolver;
+import org.springframework.data.relational.core.dialect.Dialect;
+import org.springframework.jdbc.core.ConnectionCallback;
+import org.springframework.jdbc.core.JdbcOperations;
+
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.SQLException;
+import java.util.Locale;
+import java.util.Optional;
+
+public class SQLiteDialectResolver implements DialectResolver.JdbcDialectProvider {
+
+    private static Dialect getDialect(Connection connection) throws SQLException {
+        DatabaseMetaData metaData = connection.getMetaData();
+        String name = metaData.getDatabaseProductName().toLowerCase(Locale.ROOT);
+        if (name.contains("sqlite")) {
+            return SQLiteDialect.INSTANCE;
+        }
+        return null;
+    }
+
+    @Override
+    public Optional<Dialect> getDialect(JdbcOperations operations) {
+        return Optional.ofNullable(
+                operations.execute((ConnectionCallback<Dialect>) SQLiteDialectResolver::getDialect));
+    }
+}
+#+END_SRC
+
+***  Config file for the dialect resolver
+
+The dialect resolver is a file called ~spring.factories~, located in ~resources/META-INF/~. It contains a single line
+
+#+BEGIN_SRC
+org.springframework.data.jdbc.repository.config.DialectResolver$JdbcDialectProvider=ws.inflo.app.sqlite.SQLiteDialectResolver
+#+END_SRC
+
+This is it.
+
+** Demonstration.
+
+I have defined a dummy User entity and provided some repositories for persistance. ~UserService~ service class has methods to create and retrieve users. The tests show how these work.
+
+The following piece of code in ~build.gradle~ ensures that the dummy database is created before tests are executed.
+
+#+BEGIN_SRC groovy
+  // Create an SQLITE  DB
+task createTempSqliteDB {
+    exec {
+        workingDir '.'
+        commandLine  'sh', '-c', 'rm -f /tmp/test.db ; touch /tmp/test.db'
+    }
+}
+
+tasks.test.dependsOn("createTempSqliteDB")
+#+END_SRC
